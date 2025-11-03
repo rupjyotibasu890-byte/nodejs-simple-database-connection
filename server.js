@@ -1,6 +1,6 @@
 import express from "express";
-import mysql from "mysql2";
 import bodyParser from "body-parser";
+import mysql from "mysql2";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -12,57 +12,57 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 app.set("view engine", "ejs");
 
-// ✅ Railway MySQL connection
+// Connect to MySQL
 const db = mysql.createConnection({
-  host: "mysql.railway.internal",
-  user: "root",
-  password: "WmQeTknhWyKPplIeOPdXTzkpuIjRZQhF", // from your screenshot
-  database: "railway",
-  port: 3306,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
 });
 
-// ✅ Connect to MySQL
 db.connect((err) => {
   if (err) {
-    console.error("❌ MySQL connection failed:", err);
+    console.error("❌ Database connection failed:", err);
   } else {
-    console.log("✅ Connected to Railway MySQL Database!");
+    console.log("✅ Connected to MySQL database");
+    db.query(
+      `CREATE TABLE IF NOT EXISTS products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) NOT NULL
+      )`,
+      (err) => {
+        if (err) console.error("Error creating table:", err);
+        else console.log("🟢 Table ready!");
+      }
+    );
   }
 });
 
-// ✅ Create table if it doesn’t exist
-db.query(
-  `CREATE TABLE IF NOT EXISTS products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    price FLOAT NOT NULL
-  )`,
-  (err) => {
-    if (err) console.error("❌ Table creation error:", err);
-    else console.log("✅ Table ready");
-  }
-);
-
-// ✅ Homepage - show all products
+// Routes
 app.get("/", (req, res) => {
   db.query("SELECT * FROM products", (err, results) => {
-    if (err) return res.status(500).send("Database error");
+    if (err) {
+      console.error(err);
+      return res.send("Database error");
+    }
     res.render("index", { products: results });
   });
 });
 
-// ✅ Add product
 app.post("/add", (req, res) => {
   const { name, price } = req.body;
   if (!name || !price) return res.redirect("/");
   db.query("INSERT INTO products (name, price) VALUES (?, ?)", [name, price], (err) => {
-    if (err) console.error("Insert error:", err);
+    if (err) console.error(err);
     res.redirect("/");
   });
 });
 
-// ✅ Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+
