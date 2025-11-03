@@ -59,6 +59,8 @@ app.post("/add", async (req, res) => {
   await db.run("INSERT INTO products (name, price) VALUES (?, ?)", [name, price]);
   res.redirect("/");
 });
-
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
+
