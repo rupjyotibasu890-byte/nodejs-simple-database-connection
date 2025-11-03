@@ -23,7 +23,25 @@ db.connect(err => {
     return;
   }
   console.log('✅ Connected to MySQL database');
+
+// ✅ Ensure 'products' table exists
+const createTableQuery = `
+  CREATE TABLE IF NOT EXISTS products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10,2) NOT NULL
+  )
+`;
+
+db.query(createTableQuery, (err) => {
+  if (err) {
+    console.error('❌ Failed to create table:', err);
+  } else {
+    console.log('✅ Products table ready');
+  }
 });
+});
+
 app.get('/', (req, res) => {
   res.send('✅ API is running! Try /products to see data.');
 });
