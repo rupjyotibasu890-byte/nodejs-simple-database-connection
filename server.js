@@ -1,74 +1,69 @@
-const express = require('express');
-const mysql = require('mysql2');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+import express from "express";
+import mysql from "mysql2";
+import bodyParser from "body-parser";
+import cors from "cors";
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static("public"));
 
-// ✅ Create MySQL connection using Railway environment variables
+// ✅ Create MySQL connection (Railway provides these automatically)
 const db = mysql.createConnection({
-  host: process.env.MYSQLHOST || 'localhost',
-  user: process.env.MYSQLUSER || 'root',
-  password: process.env.MYSQLPASSWORD || '',
-  database: process.env.MYSQLDATABASE || 'test',
-  port: process.env.MYSQLPORT || 3306
+  host: process.env.MYSQLHOST,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  port: process.env.MYSQLPORT,
 });
 
 // ✅ Connect to MySQL
-db.connect(err => {
+db.connect((err) => {
   if (err) {
-    console.error('❌ Database connection failed:', err.stack);
+    console.error("❌ Database connection failed:", err);
     return;
   }
-  console.log('✅ Connected to MySQL database');
+  console.log("✅ Connected to MySQL database");
 
-// ✅ Ensure 'products' table exists
-const createTableQuery = `
-  CREATE TABLE IF NOT EXISTS products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    price DECIMAL(10,2) NOT NULL
-  )
-`;
-
-db.query(createTableQuery, (err) => {
-  if (err) {
-    console.error('❌ Failed to create table:', err);
-  } else {
-    console.log('✅ Products table ready');
-  }
-});
+  // Create table if not exists
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      price DECIMAL(10,2) NOT NULL
+    )
+  `;
+  db.query(createTableQuery, (err) => {
+    if (err) console.error("❌ Error creating table:", err);
+    else console.log("✅ Table 'products' is ready");
+  });
 });
 
-app.get('/', (req, res) => {
-  res.send('✅ API is running! Try /products to see data.');
-});
-
-// Example route — Get all products
-app.get('/products', (req, res) => {
-  db.query('SELECT * FROM products', (err, results) => {
+// ✅ Routes
+app.get("/products", (req, res) => {
+  db.query("SELECT * FROM products", (err, results) => {
     if (err) {
       console.error(err);
-      return res.status(500).send('Error fetching products');
+      return res.status(500).send("Error fetching products");
     }
     res.json(results);
   });
 });
 
-// Example route — Add a product
-app.post('/products', (req, res) => {
+app.post("/products", (req, res) => {
   const { name, price } = req.body;
-  const sql = 'INSERT INTO products (name, price) VALUES (?, ?)';
-  db.query(sql, [name, price], (err, result) => {
+  if (!name || !price) return res.status(400).send("Missing fields");
+  const sql = "INSERT INTO products (name, price) VALUES (?, ?)";
+  db.query(sql, [name, price], (err) => {
     if (err) {
       console.error(err);
-      return res.status(500).send('Error adding product');
+      return res.status(500).send("Error adding product");
     }
-    res.send('Product added successfully');
+    res.send("✅ Product added successfully");
   });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
