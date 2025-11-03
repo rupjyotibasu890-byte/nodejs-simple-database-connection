@@ -1,19 +1,18 @@
-import express from "express";
-import mysql from "mysql2/promise";
-import bodyParser from "body-parser";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require("express");
+const mysql = require("mysql2");
+const bodyParser = require("body-parser");
+const path = require("path");
 
 const app = express();
+
+// Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.set("view engine", "ejs");
 
-// ✅ MySQL Connection (Railway + Local fallback)
-const pool = mysql.createPool({
+// ✅ MySQL Connection (works locally & on Railway)
+const db = mysql.createConnection({
   host: process.env.MYSQLHOST || "localhost",
   user: process.env.MYSQLUSER || "root",
   password: process.env.MYSQLPASSWORD || "",
@@ -21,49 +20,46 @@ const pool = mysql.createPool({
   port: process.env.MYSQLPORT || 3306,
 });
 
-// ✅ Ensure `products` table exists and has initial data
-(async () => {
-  const connection = await pool.getConnection();
-  await connection.query(`
+// ✅ Connect to DB
+db.connect((err) => {
+  if (err) {
+    console.error("❌ Database connection failed:", err.stack);
+    process.exit(1);
+  }
+  console.log("✅ Connected to MySQL database");
+
+  // Ensure products table exists
+  const createTableQuery = `
     CREATE TABLE IF NOT EXISTS products (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(100) NOT NULL,
-      price DECIMAL(10,2) NOT NULL
+      name VARCHAR(100),
+      price DECIMAL(10,2)
     )
-  `);
-
-  // Insert sample data only if table empty
-  const [rows] = await connection.query("SELECT COUNT(*) AS count FROM products");
-  if (rows[0].count === 0) {
-    await connection.query(`
-      INSERT INTO products (name, price) VALUES
-      ('Laptop', 55000),
-      ('Mobile', 20000),
-      ('Headphones', 2500),
-      ('Smartwatch', 4500),
-      ('Camera', 32000)
-    `);
-    console.log("🟢 Sample products added!");
-  }
-
-  connection.release();
-})();
-
-// ✅ Homepage — Show all products
-app.get("/", async (req, res) => {
-  const [products] = await pool.query("SELECT * FROM products");
-  res.render("index", { products });
+  `;
+  db.query(createTableQuery, (err) => {
+    if (err) console.error("❌ Error creating products table:", err);
+    else console.log("✅ Table 'products' is ready");
+  });
 });
 
-// ✅ Add new product
-app.post("/add", async (req, res) => {
+// ✅ Homepage – List all products
+app.get("/", (req, res) => {
+  db.query("SELECT * FROM products", (err, results) => {
+    if (err) return res.status(500).send("Database error");
+    res.render("index", { products: results });
+  });
+});
+
+// ✅ Add a new product
+app.post("/add", (req, res) => {
   const { name, price } = req.body;
-  if (name && price) {
-    await pool.query("INSERT INTO products (name, price) VALUES (?, ?)", [name, price]);
-  }
-  res.redirect("/");
+  if (!name || !price) return res.status(400).send("Missing fields");
+  db.query("INSERT INTO products (name, price) VALUES (?, ?)", [name, price], (err) => {
+    if (err) return res.status(500).send("Database insert error");
+    res.redirect("/");
+  });
 });
 
-// ✅ Start server
-const PORT = process.env.PORT || 3000;
+// ✅ Start Server
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
