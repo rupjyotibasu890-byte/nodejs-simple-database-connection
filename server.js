@@ -24,6 +24,9 @@ db.connect(err => {
   }
   console.log('✅ Connected to MySQL database');
 });
+app.get('/', (req, res) => {
+  res.send('✅ API is running! Try /products to see data.');
+});
 
 // Example route — Get all products
 app.get('/products', (req, res) => {
