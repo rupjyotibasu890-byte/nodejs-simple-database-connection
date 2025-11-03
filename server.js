@@ -1,6 +1,5 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
+import mysql from "mysql2";
 import bodyParser from "body-parser";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -13,54 +12,57 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 app.set("view engine", "ejs");
 
-let db;
-
-// Open or create SQLite database
-(async () => {
-  db = await open({
-    filename: path.join(__dirname, "products.db"),
-    driver: sqlite3.Database,
-  });
-
-  // Create table if it doesn't exist
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      price REAL NOT NULL
-    );
-  `);
-
-  // Insert sample data if table is empty
-  const row = await db.get("SELECT COUNT(*) as count FROM products");
-  if (row.count === 0) {
-    await db.exec(`
-      INSERT INTO products (name, price) VALUES
-      ('Laptop', 55000),
-      ('Mobile', 20000),
-      ('Headphones', 2500),
-      ('Smartwatch', 4500),
-      ('Camera', 32000);
-    `);
-    console.log("🟢 Sample data inserted!");
-  }
-})();
-
-// Homepage: display all products
-app.get("/", async (req, res) => {
-  const products = await db.all("SELECT * FROM products");
-  res.render("index", { products });
+// ✅ Railway MySQL connection
+const db = mysql.createConnection({
+  host: "mysql.railway.internal",
+  user: "root",
+  password: "WmQeTknhWyKPplIeOPdXTzkpuIjRZQhF", // from your screenshot
+  database: "railway",
+  port: 3306,
 });
 
-// Add new product
-app.post("/add", async (req, res) => {
+// ✅ Connect to MySQL
+db.connect((err) => {
+  if (err) {
+    console.error("❌ MySQL connection failed:", err);
+  } else {
+    console.log("✅ Connected to Railway MySQL Database!");
+  }
+});
+
+// ✅ Create table if it doesn’t exist
+db.query(
+  `CREATE TABLE IF NOT EXISTS products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    price FLOAT NOT NULL
+  )`,
+  (err) => {
+    if (err) console.error("❌ Table creation error:", err);
+    else console.log("✅ Table ready");
+  }
+);
+
+// ✅ Homepage - show all products
+app.get("/", (req, res) => {
+  db.query("SELECT * FROM products", (err, results) => {
+    if (err) return res.status(500).send("Database error");
+    res.render("index", { products: results });
+  });
+});
+
+// ✅ Add product
+app.post("/add", (req, res) => {
   const { name, price } = req.body;
   if (!name || !price) return res.redirect("/");
-  await db.run("INSERT INTO products (name, price) VALUES (?, ?)", [name, price]);
-  res.redirect("/");
-});
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  db.query("INSERT INTO products (name, price) VALUES (?, ?)", [name, price], (err) => {
+    if (err) console.error("Insert error:", err);
+    res.redirect("/");
+  });
 });
 
+// ✅ Start server
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
